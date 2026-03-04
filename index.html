@@ -519,7 +519,7 @@
           </div>
           <div class="panel-actions">
             <span class="char-count" id="output-count">0 chars</span>
-            <div id="segment-toggle" style="display:inline-flex;background:var(--bg);border-radius:6px;padding:2px;gap:2px;font-size:11px;">
+            <div id="segment-toggle" style="display:inline-flex;background:var(--bg);border-radius:6px;padding:2px;gap:2px;font-size:11px;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;">
               <button id="seg-text" style="padding:5px 12px;border:none;border-radius:4px;cursor:pointer;background:var(--accent);color:#fff;font-size:11px;font-family:var(--sans);touch-action:manipulation;-webkit-tap-highlight-color:transparent;">Text</button>
               <button id="seg-md" style="padding:5px 12px;border:none;border-radius:4px;cursor:pointer;background:transparent;color:var(--text-muted);font-size:11px;font-family:var(--sans);touch-action:manipulation;-webkit-tap-highlight-color:transparent;">Markdown</button>
             </div>
@@ -938,8 +938,7 @@
         previewEl.style.display = 'none';
       }
     }
-    segText.addEventListener('click', () => setSegment(false));
-    segMd.addEventListener('click', () => setSegment(true));
+    document.getElementById('segment-toggle').addEventListener('click', () => setSegment(!previewMode));
 
     // Initial state
     btnCopy.disabled = true;
