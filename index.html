@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LineFix — CLI出力の改行崩れを直す</title>
+  <meta name="description" content="CLIやAIの出力をペーストするだけで、不要な改行を自動除去。段落・リスト・コードブロックは維持。">
+
+  <!-- OGP -->
+  <meta property="og:title" content="LineFix — CLI出力の改行崩れを直す">
+  <meta property="og:description" content="CLIやAIの出力をペーストするだけで、不要な改行を自動除去。段落・リスト・コードブロックは維持。">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://linefix.app">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="LineFix — CLI出力の改行崩れを直す">
+  <meta name="twitter:description" content="CLIやAIの出力をペーストするだけで、不要な改行を自動除去。段落・リスト・コードブロックは維持。">
+
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #1a1a2e;
+      --bg-panel: #16213e;
+      --bg-input: #0f3460;
+      --bg-surface: #1e2a45;
+      --accent: #e94560;
+      --accent-hover: #ff5c7a;
+      --accent-dim: rgba(233, 69, 96, 0.15);
+      --text: #e8eaf6;
+      --text-muted: #7986a8;
+      --text-dim: #4a5580;
+      --border: #253058;
+      --border-focus: #e94560;
+      --success: #4caf8a;
+      --success-dim: rgba(76, 175, 138, 0.15);
+      --mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+    }
+
+    html, body {
+      height: 100%;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      padding: 18px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-panel);
+      flex-shrink: 0;
+    }
+
+    .logo-wrap {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .logo-icon {
+      width: 36px;
+      height: 36px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .logo-icon svg {
+      width: 20px;
+      height: 20px;
+      fill: none;
+      stroke: #fff;
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .logo-text {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .logo-name {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: var(--text);
+      line-height: 1;
+    }
+
+    .logo-name span {
+      color: var(--accent);
+    }
+
+    .tagline {
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.3px;
+    }
+
+    .header-badge {
+      font-size: 11px;
+      font-family: var(--mono);
+      background: var(--accent-dim);
+      color: var(--accent);
+      border: 1px solid rgba(233, 69, 96, 0.3);
+      padding: 4px 10px;
+      border-radius: 20px;
+      letter-spacing: 0.5px;
+    }
+
+    /* ── Main layout ── */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 24px 32px;
+      gap: 16px;
+      overflow: hidden;
+    }
+
+    .panels {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* ── Panel ── */
+    .panel {
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+
+    .panel:focus-within {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px var(--accent-dim);
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .panel-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+    }
+
+    .panel-label .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--text-dim);
+    }
+
+    .panel-label .dot.active {
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent);
+    }
+
+    .char-count {
+      font-size: 11px;
+      font-family: var(--mono);
+      color: var(--text-dim);
+    }
+
+    /* ── Textarea ── */
+    textarea {
+      flex: 1;
+      width: 100%;
+      background: transparent;
+      border: none;
+      outline: none;
+      resize: none;
+      padding: 16px;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.65;
+      color: var(--text);
+      caret-color: var(--accent);
+    }
+
+    textarea::placeholder {
+      color: var(--text-dim);
+      line-height: 1.6;
+    }
+
+    textarea::-webkit-scrollbar,
+    .output-text::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    textarea::-webkit-scrollbar-track,
+    .output-text::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    textarea::-webkit-scrollbar-thumb,
+    .output-text::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 3px;
+    }
+
+    /* ── Output ── */
+    .output-text {
+      flex: 1;
+      padding: 16px;
+      font-family: var(--sans);
+      font-size: 13.5px;
+      line-height: 1.75;
+      color: var(--text);
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      user-select: text;
+    }
+
+    .output-text.empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-dim);
+      font-size: 13px;
+    }
+
+    .output-placeholder {
+      text-align: center;
+    }
+
+    .output-placeholder .icon {
+      font-size: 32px;
+      margin-bottom: 10px;
+      opacity: 0.4;
+    }
+
+    .output-placeholder p {
+      font-size: 13px;
+      color: var(--text-dim);
+      line-height: 1.5;
+    }
+
+    /* ── Action buttons ── */
+    .panel-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 11px;
+      font-family: var(--sans);
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      letter-spacing: 0.3px;
+      white-space: nowrap;
+    }
+
+    .btn:hover {
+      background: var(--bg-input);
+      color: var(--text);
+      border-color: var(--text-dim);
+    }
+
+    .btn svg {
+      width: 12px;
+      height: 12px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      flex-shrink: 0;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+      border-color: var(--accent-hover);
+      color: #fff;
+    }
+
+    .btn-success {
+      background: var(--success-dim);
+      border-color: var(--success);
+      color: var(--success) !important;
+    }
+
+    .btn-success svg {
+      stroke: var(--success);
+    }
+
+    /* ── Stats bar ── */
+    .stats-bar {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      padding: 10px 16px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 11.5px;
+      color: var(--text-muted);
+      font-family: var(--mono);
+    }
+
+    .stat {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .stat-label {
+      color: var(--text-dim);
+    }
+
+    .stat-value {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .stat-value.accent {
+      color: var(--accent);
+    }
+
+    .stat-sep {
+      color: var(--border);
+    }
+
+    /* ── Footer ── */
+    footer {
+      padding: 14px 32px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-panel);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .footer-left {
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    .footer-left span {
+      color: var(--accent);
+    }
+
+    .footer-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .footer-link {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    .footer-link:hover {
+      color: var(--text);
+    }
+
+    .footer-link svg {
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      header {
+        padding: 14px 16px;
+      }
+
+      main {
+        padding: 16px;
+      }
+
+      .panels {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr 1fr;
+      }
+
+      .stats-bar {
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      footer {
+        padding: 12px 16px;
+        flex-direction: column;
+        gap: 8px;
+        text-align: center;
+      }
+
+      .header-badge {
+        display: none;
+      }
+    }
+
+    /* ── Animations ── */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .output-text:not(.empty) {
+      animation: fadeIn 0.15s ease;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.5; }
+    }
+
+    .dot.active {
+      animation: pulse 2s infinite;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo-wrap">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24">
+          <path d="M4 6h16M4 12h10M4 18h14"/>
+        </svg>
+      </div>
+      <div class="logo-text">
+        <div class="logo-name">Line<span>Fix</span></div>
+        <div class="tagline">CLIやAIの出力コピペを、きれいに整形します。</div>
+      </div>
+    </div>
+    <div class="header-badge">v1.0</div>
+  </header>
+
+  <main>
+    <div class="panels">
+      <!-- Input Panel -->
+      <div class="panel" id="panel-input">
+        <div class="panel-header">
+          <div class="panel-label">
+            <div class="dot active" id="input-dot"></div>
+            Input
+          </div>
+          <div class="panel-actions">
+            <span class="char-count" id="input-count">0 chars</span>
+            <button class="btn" id="btn-clear" title="クリア">
+              <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              Clear
+            </button>
+          </div>
+        </div>
+        <textarea
+          id="input"
+          placeholder="CLIやAIの出力をここにペースト..."
+          spellcheck="false"
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="off"
+        ></textarea>
+      </div>
+
+      <!-- Output Panel -->
+      <div class="panel" id="panel-output">
+        <div class="panel-header">
+          <div class="panel-label">
+            <div class="dot" id="output-dot"></div>
+            Output
+          </div>
+          <div class="panel-actions">
+            <span class="char-count" id="output-count">0 chars</span>
+            <button class="btn btn-primary" id="btn-copy" title="コピー">
+              <svg id="copy-icon" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              <svg id="check-icon" viewBox="0 0 24 24" style="display:none"><path d="M20 6L9 17l-5-5"/></svg>
+              <span id="copy-label">Copy</span>
+            </button>
+          </div>
+        </div>
+        <div class="output-text empty" id="output">
+          <div class="output-placeholder">
+            <div class="icon">⚡</div>
+            <p>左にテキストをペーストすると<br>ここに整形結果が表示されます</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats bar -->
+    <div class="stats-bar" id="stats-bar" style="display:none">
+      <div class="stat">
+        <span class="stat-label">入力</span>
+        <span class="stat-value" id="stat-in-lines">—</span>
+        <span class="stat-label">行</span>
+      </div>
+      <span class="stat-sep">·</span>
+      <div class="stat">
+        <span class="stat-label">出力</span>
+        <span class="stat-value accent" id="stat-out-lines">—</span>
+        <span class="stat-label">行</span>
+      </div>
+      <span class="stat-sep">·</span>
+      <div class="stat">
+        <span class="stat-label">削減</span>
+        <span class="stat-value accent" id="stat-saved">—</span>
+        <span class="stat-label">行</span>
+      </div>
+      <span class="stat-sep">·</span>
+      <div class="stat">
+        <span class="stat-label">モード</span>
+        <span class="stat-value" id="stat-mode">—</span>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="footer-left">Made with <span>♥</span> for devs who paste a lot</div>
+    <div class="footer-right">
+      <a class="footer-link" href="https://github.com" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
+        </svg>
+        GitHub
+      </a>
+    </div>
+  </footer>
+
+  <script>
+    // ── LineFix core logic ──
+    // Smart join: no space between CJK characters, space otherwise
+    function smartJoin(parts) {
+      if (parts.length === 0) return '';
+      let result = parts[0];
+      const cjk = /[\u3000-\u9fff\uf900-\ufaff\uff00-\uffef]/;
+      for (let i = 1; i < parts.length; i++) {
+        const prev = result.slice(-1);
+        const next = parts[i].charAt(0);
+        const sep = (cjk.test(prev) && cjk.test(next)) ? '' : ' ';
+        result += sep + parts[i];
+      }
+      return result;
+    }
+
+    function fixLines(text) {
+      if (!text.trim()) return '';
+
+      // Strip leading whitespace per line (left-align)
+      // Keep relative indent for lines starting with list markers or code
+      let lines = text.split('\n');
+      lines = lines.map(l => {
+        // Preserve indent for list items (strip only 1 leading space if present)
+        if (/^\s*([-*+]|\d+\.)\s/.test(l)) return l.replace(/^ /, '');
+        // All other lines: strip all leading spaces
+        return l.replace(/^ +/, '');
+      });
+      const result = [];
+      let i = 0;
+
+      while (i < lines.length) {
+        const line = lines[i];
+
+        // Empty line → paragraph break, preserve
+        if (line.trim() === '') {
+          result.push('');
+          i++;
+          continue;
+        }
+
+        // Code block: ``` ... ```
+        if (line.trim().startsWith('```')) {
+          result.push(line);
+          i++;
+          while (i < lines.length) {
+            result.push(lines[i]);
+            if (lines[i].trim().startsWith('```') && i > (result.length - 2)) {
+              i++;
+              break;
+            }
+            i++;
+          }
+          continue;
+        }
+
+        // Heading: # ## ### etc.
+        if (/^#{1,6}\s/.test(line)) {
+          result.push(line);
+          i++;
+          continue;
+        }
+
+        // Horizontal rule
+        if (/^(---+|===+|\*\*\*+)$/.test(line.trim())) {
+          result.push(line);
+          i++;
+          continue;
+        }
+
+        // Table: starts with |
+        if (/^\s*\|/.test(line)) {
+          result.push(line);
+          i++;
+          continue;
+        }
+
+        // Blockquote: starts with >
+        if (/^\s*>/.test(line)) {
+          result.push(line);
+          i++;
+          continue;
+        }
+
+        // Indented code (4 spaces or tab)
+        if (/^( {4}|\t)/.test(line)) {
+          result.push(line);
+          i++;
+          continue;
+        }
+
+        // List items: -, *, +, or numbered 1. — merge wrapped continuation lines
+        if (/^\s*([-*+]|\d+\.)\s/.test(line)) {
+          const parts = [line.trimEnd()];
+          i++;
+          while (i < lines.length) {
+            const next = lines[i];
+            // Stop if: empty, new list item, heading, code, table, blockquote, fence, rule
+            if (
+              next.trim() === '' ||
+              /^\s*([-*+]|\d+\.)\s/.test(next) ||
+              /^#{1,6}\s/.test(next) ||
+              next.trim().startsWith('```') ||
+              /^\s*\|/.test(next) ||
+              /^\s*>/.test(next) ||
+              /^( {4}|\t)/.test(next) ||
+              /^(---+|===+|\*\*\*+)$/.test(next.trim())
+            ) {
+              break;
+            }
+            // Continuation line — merge
+            parts.push(next.trim());
+            i++;
+          }
+          result.push(smartJoin(parts));
+          continue;
+        }
+
+        // Regular paragraph text — merge consecutive lines
+        const paragraph = [line.trimEnd()];
+        i++;
+        while (i < lines.length) {
+          const next = lines[i];
+
+          // Stop merging on: empty line, special syntax
+          if (
+            next.trim() === '' ||
+            next.trim().startsWith('```') ||
+            /^#{1,6}\s/.test(next) ||
+            /^\s*\|/.test(next) ||
+            /^\s*>/.test(next) ||
+            /^( {4}|\t)/.test(next) ||
+            /^\s*([-*+]|\d+\.)\s/.test(next) ||
+            /^(---+|===+|\*\*\*+)$/.test(next.trim())
+          ) {
+            break;
+          }
+
+          paragraph.push(next.trimEnd());
+          i++;
+        }
+
+        result.push(smartJoin(paragraph));
+      }
+
+      // Normalize: collapse 3+ consecutive blank lines → 2
+      const normalized = [];
+      let blankCount = 0;
+      for (const line of result) {
+        if (line === '') {
+          blankCount++;
+          if (blankCount <= 2) normalized.push(line);
+        } else {
+          blankCount = 0;
+          normalized.push(line);
+        }
+      }
+
+      return normalized.join('\n').trim();
+    }
+
+    // ── DOM refs ──
+    const inputEl     = document.getElementById('input');
+    const outputEl    = document.getElementById('output');
+    const btnCopy     = document.getElementById('btn-copy');
+    const btnClear    = document.getElementById('btn-clear');
+    const inputCount  = document.getElementById('input-count');
+    const outputCount = document.getElementById('output-count');
+    const inputDot    = document.getElementById('input-dot');
+    const outputDot   = document.getElementById('output-dot');
+    const statsBar    = document.getElementById('stats-bar');
+    const statInLines  = document.getElementById('stat-in-lines');
+    const statOutLines = document.getElementById('stat-out-lines');
+    const statSaved    = document.getElementById('stat-saved');
+    const statMode     = document.getElementById('stat-mode');
+    const copyIcon    = document.getElementById('copy-icon');
+    const checkIcon   = document.getElementById('check-icon');
+    const copyLabel   = document.getElementById('copy-label');
+
+    let copyTimeout = null;
+
+    function countChars(str) {
+      return str.length;
+    }
+
+    function fmtChars(n) {
+      if (n === 0) return '0 chars';
+      return n.toLocaleString('ja-JP') + ' chars';
+    }
+
+    function detectMode(text) {
+      if (!text.trim()) return '—';
+      const lines = text.split('\n');
+      const hasCode = lines.some(l => l.trim().startsWith('```'));
+      const hasMd = lines.some(l => /^#{1,6}\s/.test(l) || /^\s*([-*+]|\d+\.)\s/.test(l));
+      const hasTable = lines.some(l => /^\s*\|/.test(l));
+      if (hasCode) return 'Markdown + Code';
+      if (hasMd && hasTable) return 'Markdown + Table';
+      if (hasMd) return 'Markdown';
+      if (hasTable) return 'Table';
+      return 'Plain text';
+    }
+
+    function update() {
+      const raw = inputEl.value;
+      const chars = countChars(raw);
+
+      inputCount.textContent = fmtChars(chars);
+
+      if (!raw.trim()) {
+        outputEl.innerHTML = `
+          <div class="output-placeholder">
+            <div class="icon">⚡</div>
+            <p>左にテキストをペーストすると<br>ここに整形結果が表示されます</p>
+          </div>`;
+        outputEl.classList.add('empty');
+        outputCount.textContent = '0 chars';
+        outputDot.classList.remove('active');
+        statsBar.style.display = 'none';
+        btnCopy.disabled = true;
+        btnCopy.style.opacity = '0.5';
+        return;
+      }
+
+      const fixed = fixLines(raw);
+      outputEl.textContent = fixed;
+      outputEl.classList.remove('empty');
+      outputDot.classList.add('active');
+      btnCopy.disabled = false;
+      btnCopy.style.opacity = '';
+
+      const outChars = countChars(fixed);
+      outputCount.textContent = fmtChars(outChars);
+
+      // Stats
+      const inLines  = raw.split('\n').length;
+      const outLines = fixed.split('\n').length;
+      const saved    = Math.max(0, inLines - outLines);
+      statInLines.textContent  = inLines.toLocaleString('ja-JP');
+      statOutLines.textContent = outLines.toLocaleString('ja-JP');
+      statSaved.textContent    = saved.toLocaleString('ja-JP');
+      statMode.textContent     = detectMode(raw);
+      statsBar.style.display   = '';
+    }
+
+    // ── Events ──
+    inputEl.addEventListener('input', update);
+
+    inputEl.addEventListener('focus', () => {
+      inputDot.classList.add('active');
+    });
+    inputEl.addEventListener('blur', () => {
+      if (!inputEl.value.trim()) inputDot.classList.remove('active');
+    });
+
+    btnClear.addEventListener('click', () => {
+      inputEl.value = '';
+      update();
+      inputEl.focus();
+    });
+
+    btnCopy.addEventListener('click', async () => {
+      const text = outputEl.textContent;
+      if (!text) return;
+
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        // Fallback for older browsers
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+
+      // Success animation
+      btnCopy.classList.remove('btn-primary');
+      btnCopy.classList.add('btn-success');
+      copyIcon.style.display = 'none';
+      checkIcon.style.display = '';
+      copyLabel.textContent = 'Copied!';
+
+      if (copyTimeout) clearTimeout(copyTimeout);
+      copyTimeout = setTimeout(() => {
+        btnCopy.classList.add('btn-primary');
+        btnCopy.classList.remove('btn-success');
+        copyIcon.style.display = '';
+        checkIcon.style.display = 'none';
+        copyLabel.textContent = 'Copy';
+        copyTimeout = null;
+      }, 2000);
+    });
+
+    // Initial state
+    btnCopy.disabled = true;
+    btnCopy.style.opacity = '0.5';
+
+    // Handle initial value (e.g. from bfcache)
+    if (inputEl.value) update();
+  </script>
+</body>
+</html>
