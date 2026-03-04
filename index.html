@@ -607,7 +607,13 @@
       // Strip leading whitespace per line (left-align)
       // Keep relative indent for lines starting with list markers or code
       let lines = text.split('\n');
-      lines = lines.map(l => l.replace(/^ +/, ''));
+      // Strip leading spaces, but preserve inside code blocks
+      let inFence = false;
+      lines = lines.map(l => {
+        if (l.trim().startsWith('```')) { inFence = !inFence; return l.replace(/^ +/, ''); }
+        if (inFence) return l; // preserve code indent
+        return l.replace(/^ +/, '');
+      });
       const result = [];
       let i = 0;
 
@@ -626,12 +632,10 @@
           result.push(line);
           i++;
           while (i < lines.length) {
-            result.push(lines[i]);
-            if (lines[i].trim().startsWith('```') && i > (result.length - 2)) {
-              i++;
-              break;
-            }
+            const cl = lines[i];
+            result.push(cl);
             i++;
+            if (cl.trim().startsWith('```')) break;
           }
           continue;
         }
