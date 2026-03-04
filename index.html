@@ -519,6 +519,9 @@
           </div>
           <div class="panel-actions">
             <span class="char-count" id="output-count">0 chars</span>
+            <button class="btn" id="btn-preview" title="Markdownプレビュー切替" style="font-size:12px;padding:4px 10px;background:var(--bg-input);border:1px solid var(--border);color:var(--text-muted);cursor:pointer;border-radius:6px;">
+              Raw
+            </button>
             <button class="btn btn-primary" id="btn-copy" title="コピー">
               <svg id="copy-icon" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
               <svg id="check-icon" viewBox="0 0 24 24" style="display:none"><path d="M20 6L9 17l-5-5"/></svg>
@@ -527,6 +530,7 @@
           </div>
         </div>
         <textarea class="output-text empty" id="output" placeholder="⚡ 左にテキストをペーストすると整形結果がここに表示されます" spellcheck="false" autocorrect="off"></textarea>
+        <div class="output-text" id="output-preview" style="display:none;padding:16px;overflow-y:auto;font-family:var(--sans);font-size:13.5px;line-height:1.75;color:var(--text);"></div>
       </div>
     </div>
 
@@ -751,8 +755,11 @@
     // ── DOM refs ──
     const inputEl     = document.getElementById('input');
     const outputEl    = document.getElementById('output');
+    const previewEl   = document.getElementById('output-preview');
+    const btnPreview  = document.getElementById('btn-preview');
     const btnCopy     = document.getElementById('btn-copy');
     const btnClear    = document.getElementById('btn-clear');
+    let previewMode = false;
     const inputCount  = document.getElementById('input-count');
     const outputCount = document.getElementById('output-count');
     const inputDot    = document.getElementById('input-dot');
@@ -826,6 +833,11 @@
       statSaved.textContent    = saved.toLocaleString('ja-JP');
       statMode.textContent     = detectMode(raw);
       statsBar.style.display   = '';
+
+      // Update preview if in preview mode
+      if (previewMode) {
+        previewEl.innerHTML = mdToHtml(fixed);
+      }
     }
 
     // ── Events ──
@@ -877,6 +889,61 @@
         copyLabel.textContent = 'Copy';
         copyTimeout = null;
       }, 2000);
+    });
+
+    // Simple Markdown → HTML
+    function mdToHtml(text) {
+      const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const lines = text.split('\n');
+      let html = '', inCode = false, inList = false, listType = '';
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.trim().startsWith('```')) {
+          if (inCode) { html += '</code></pre>'; inCode = false; }
+          else { html += '<pre style="background:var(--bg);padding:12px;border-radius:6px;overflow-x:auto;margin:8px 0"><code>'; inCode = true; }
+          continue;
+        }
+        if (inCode) { html += esc(line) + '\n'; continue; }
+        if (line.trim() === '') {
+          if (inList) { html += listType === 'ul' ? '</ul>' : '</ol>'; inList = false; }
+          html += '<br>'; continue;
+        }
+        const hm = line.match(/^(#{1,6})\s+(.+)/);
+        if (hm) { const lv = hm[1].length; html += `<h${lv} style="margin:12px 0 6px;font-size:${1.3-lv*0.1}em">${esc(hm[2])}</h${lv}>`; continue; }
+        const lm = line.match(/^\s*([-*+])\s+(.+)/);
+        if (lm) { if (!inList || listType !== 'ul') { if (inList) html += '</ol>'; html += '<ul style="padding-left:1.5em;margin:4px 0">'; inList = true; listType = 'ul'; } html += `<li>${esc(lm[2])}</li>`; continue; }
+        const nm = line.match(/^\s*(\d+)\.\s+(.+)/);
+        if (nm) { if (!inList || listType !== 'ol') { if (inList) html += '</ul>'; html += '<ol style="padding-left:1.5em;margin:4px 0">'; inList = true; listType = 'ol'; } html += `<li>${esc(nm[2])}</li>`; continue; }
+        if (inList) { html += listType === 'ul' ? '</ul>' : '</ol>'; inList = false; }
+        let p = esc(line);
+        p = p.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        p = p.replace(/`(.+?)`/g, '<code style="background:var(--bg);padding:2px 5px;border-radius:3px;font-size:0.9em">$1</code>');
+        html += `<p style="margin:4px 0">${p}</p>`;
+      }
+      if (inCode) html += '</code></pre>';
+      if (inList) html += listType === 'ul' ? '</ul>' : '</ol>';
+      return html;
+    }
+
+    // Preview toggle
+    btnPreview.addEventListener('click', () => {
+      previewMode = !previewMode;
+      if (previewMode) {
+        btnPreview.textContent = 'Preview';
+        btnPreview.style.background = 'var(--accent)';
+        btnPreview.style.color = '#fff';
+        btnPreview.style.borderColor = 'var(--accent)';
+        outputEl.style.display = 'none';
+        previewEl.style.display = 'block';
+        previewEl.innerHTML = mdToHtml(outputEl.value);
+      } else {
+        btnPreview.textContent = 'Raw';
+        btnPreview.style.background = 'var(--bg-input)';
+        btnPreview.style.color = 'var(--text-muted)';
+        btnPreview.style.borderColor = 'var(--border)';
+        outputEl.style.display = '';
+        previewEl.style.display = 'none';
+      }
     });
 
     // Initial state
