@@ -690,6 +690,9 @@
           i++;
           while (i < lines.length) {
             const next = lines[i];
+            const prev = parts[parts.length - 1];
+            // Stop if previous line ends with sentence-ending punctuation
+            if (/[。．.!！?？)）」』】\]]$/.test(prev.trim())) break;
             // Stop if: empty, new list item, heading, code, table, blockquote, fence, rule
             if (
               next.trim() === '' ||
@@ -716,6 +719,10 @@
         i++;
         while (i < lines.length) {
           const next = lines[i];
+          const prev = paragraph[paragraph.length - 1];
+
+          // Stop if previous line ends with sentence-ending punctuation
+          if (/[。．.!！?？)）」』】\]]$/.test(prev.trim())) break;
 
           // Stop merging on: empty line, special syntax
           if (
