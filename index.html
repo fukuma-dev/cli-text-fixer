@@ -519,9 +519,10 @@
           </div>
           <div class="panel-actions">
             <span class="char-count" id="output-count">0 chars</span>
-            <button class="btn" id="btn-preview" title="Markdownプレビュー切替" style="font-size:12px;padding:4px 10px;background:var(--bg-input);border:1px solid var(--border);color:var(--text-muted);cursor:pointer;border-radius:6px;">
-              Raw
-            </button>
+            <div id="segment-toggle" style="display:inline-flex;background:var(--bg);border-radius:6px;padding:2px;gap:2px;font-size:11px;">
+              <button id="seg-text" style="padding:3px 10px;border:none;border-radius:4px;cursor:pointer;background:var(--accent);color:#fff;font-size:11px;font-family:var(--sans);">Text</button>
+              <button id="seg-md" style="padding:3px 10px;border:none;border-radius:4px;cursor:pointer;background:transparent;color:var(--text-muted);font-size:11px;font-family:var(--sans);">Markdown</button>
+            </div>
             <button class="btn btn-primary" id="btn-copy" title="コピー">
               <svg id="copy-icon" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
               <svg id="check-icon" viewBox="0 0 24 24" style="display:none"><path d="M20 6L9 17l-5-5"/></svg>
@@ -751,7 +752,8 @@
     const inputEl     = document.getElementById('input');
     const outputEl    = document.getElementById('output');
     const previewEl   = document.getElementById('output-preview');
-    const btnPreview  = document.getElementById('btn-preview');
+    const segText     = document.getElementById('seg-text');
+    const segMd       = document.getElementById('seg-md');
     const btnCopy     = document.getElementById('btn-copy');
     const btnClear    = document.getElementById('btn-clear');
     let previewMode = false;
@@ -920,26 +922,24 @@
       return html;
     }
 
-    // Preview toggle
-    btnPreview.addEventListener('click', () => {
-      previewMode = !previewMode;
-      if (previewMode) {
-        btnPreview.textContent = 'Preview';
-        btnPreview.style.background = 'var(--accent)';
-        btnPreview.style.color = '#fff';
-        btnPreview.style.borderColor = 'var(--accent)';
+    // Segment toggle
+    function setSegment(isMd) {
+      previewMode = isMd;
+      if (isMd) {
+        segMd.style.background = 'var(--accent)'; segMd.style.color = '#fff';
+        segText.style.background = 'transparent'; segText.style.color = 'var(--text-muted)';
         outputEl.style.display = 'none';
         previewEl.style.display = 'block';
         previewEl.innerHTML = mdToHtml(outputEl.value);
       } else {
-        btnPreview.textContent = 'Raw';
-        btnPreview.style.background = 'var(--bg-input)';
-        btnPreview.style.color = 'var(--text-muted)';
-        btnPreview.style.borderColor = 'var(--border)';
+        segText.style.background = 'var(--accent)'; segText.style.color = '#fff';
+        segMd.style.background = 'transparent'; segMd.style.color = 'var(--text-muted)';
         outputEl.style.display = '';
         previewEl.style.display = 'none';
       }
-    });
+    }
+    segText.addEventListener('click', () => setSegment(false));
+    segMd.addEventListener('click', () => setSegment(true));
 
     // Initial state
     btnCopy.disabled = true;
