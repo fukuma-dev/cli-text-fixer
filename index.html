@@ -519,9 +519,10 @@
           </div>
           <div class="panel-actions">
             <span class="char-count" id="output-count">0 chars</span>
-            <div id="segment-toggle" style="display:inline-flex;background:var(--bg);border-radius:6px;padding:2px;gap:2px;font-size:11px;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;">
-              <button id="seg-text" style="padding:5px 12px;border:none;border-radius:4px;cursor:pointer;background:var(--accent);color:#fff;font-size:11px;font-family:var(--sans);touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:all 0.25s ease;">Text</button>
-              <button id="seg-md" style="padding:5px 12px;border:none;border-radius:4px;cursor:pointer;background:transparent;color:var(--text-muted);font-size:11px;font-family:var(--sans);touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:all 0.25s ease;">Markdown</button>
+            <div id="segment-toggle" style="display:inline-flex;position:relative;background:var(--bg);border-radius:6px;padding:2px;font-size:11px;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;">
+              <div id="seg-slider" style="position:absolute;top:2px;left:2px;height:calc(100% - 4px);width:50%;border-radius:4px;background:var(--accent);transition:transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);pointer-events:none;z-index:0;"></div>
+              <button id="seg-text" style="position:relative;z-index:1;padding:5px 12px;border:none;border-radius:4px;cursor:pointer;background:transparent;color:#fff;font-size:11px;font-family:var(--sans);touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:color 0.3s ease;">Text</button>
+              <button id="seg-md" style="position:relative;z-index:1;padding:5px 12px;border:none;border-radius:4px;cursor:pointer;background:transparent;color:var(--text-muted);font-size:11px;font-family:var(--sans);touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:color 0.3s ease;">Markdown</button>
             </div>
             <button class="btn btn-primary" id="btn-copy" title="コピー">
               <svg id="copy-icon" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
@@ -530,8 +531,8 @@
             </button>
           </div>
         </div>
-        <textarea class="output-text empty" id="output" placeholder="⚡ 左にテキストをペーストすると整形結果がここに表示されます" spellcheck="false" autocorrect="off" style="transition:opacity 0.2s ease;"></textarea>
-        <div class="output-text" id="output-preview" style="display:none;padding:16px;overflow-y:auto;font-family:var(--sans);font-size:13.5px;line-height:1.75;color:var(--text);opacity:0;transition:opacity 0.2s ease;"></div>
+        <textarea class="output-text empty" id="output" placeholder="⚡ 左にテキストをペーストすると整形結果がここに表示されます" spellcheck="false" autocorrect="off" style="transition:opacity 0.25s ease, transform 0.25s ease;"></textarea>
+        <div class="output-text" id="output-preview" style="display:none;padding:16px;overflow-y:auto;font-family:var(--sans);font-size:13.5px;line-height:1.75;color:var(--text);opacity:0;transition:opacity 0.25s ease, transform 0.25s ease;transform:translateY(4px);"></div>
       </div>
     </div>
 
@@ -1093,27 +1094,43 @@
     }
 
     // Segment toggle with fade
+    const segSlider = document.getElementById('seg-slider');
+
     function setSegment(isMd) {
       previewMode = isMd;
       if (isMd) {
-        segMd.style.background = 'var(--accent)'; segMd.style.color = '#fff';
-        segText.style.background = 'transparent'; segText.style.color = 'var(--text-muted)';
+        // Slide indicator right
+        segSlider.style.transform = 'translateX(100%)';
+        segMd.style.color = '#fff';
+        segText.style.color = 'var(--text-muted)';
+        // Crossfade content
         outputEl.style.opacity = '0';
+        outputEl.style.transform = 'translateY(4px)';
         setTimeout(() => {
           outputEl.style.display = 'none';
           previewEl.style.display = 'block';
           previewEl.innerHTML = mdToHtml(outputEl.value);
-          requestAnimationFrame(() => { previewEl.style.opacity = '1'; });
-        }, 200);
+          requestAnimationFrame(() => {
+            previewEl.style.opacity = '1';
+            previewEl.style.transform = 'translateY(0)';
+          });
+        }, 250);
       } else {
-        segText.style.background = 'var(--accent)'; segText.style.color = '#fff';
-        segMd.style.background = 'transparent'; segMd.style.color = 'var(--text-muted)';
+        // Slide indicator left
+        segSlider.style.transform = 'translateX(0)';
+        segText.style.color = '#fff';
+        segMd.style.color = 'var(--text-muted)';
+        // Crossfade content
         previewEl.style.opacity = '0';
+        previewEl.style.transform = 'translateY(4px)';
         setTimeout(() => {
           previewEl.style.display = 'none';
           outputEl.style.display = '';
-          requestAnimationFrame(() => { outputEl.style.opacity = '1'; });
-        }, 200);
+          requestAnimationFrame(() => {
+            outputEl.style.opacity = '1';
+            outputEl.style.transform = 'translateY(0)';
+          });
+        }, 250);
       }
     }
     document.getElementById('segment-toggle').addEventListener('click', () => setSegment(!previewMode));
