@@ -248,19 +248,11 @@
       overflow-y: auto;
       white-space: pre-wrap;
       word-break: break-word;
-      user-select: text;
-    }
-
-    .output-text.empty {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--text-dim);
-      font-size: 13px;
-    }
-
-    .output-placeholder {
-      text-align: center;
+      background: transparent;
+      border: none;
+      outline: none;
+      resize: none;
+      width: 100%;
     }
 
     .output-placeholder .icon {
@@ -534,12 +526,7 @@
             </button>
           </div>
         </div>
-        <div class="output-text empty" id="output">
-          <div class="output-placeholder">
-            <div class="icon">⚡</div>
-            <p>左にテキストをペーストすると<br>ここに整形結果が表示されます</p>
-          </div>
-        </div>
+        <textarea class="output-text empty" id="output" placeholder="⚡ 左にテキストをペーストすると整形結果がここに表示されます" spellcheck="false" autocorrect="off"></textarea>
       </div>
     </div>
 
@@ -810,11 +797,7 @@
       inputCount.textContent = fmtChars(chars);
 
       if (!raw.trim()) {
-        outputEl.innerHTML = `
-          <div class="output-placeholder">
-            <div class="icon">⚡</div>
-            <p>左にテキストをペーストすると<br>ここに整形結果が表示されます</p>
-          </div>`;
+        outputEl.value = '';
         outputEl.classList.add('empty');
         outputCount.textContent = '0 chars';
         outputDot.classList.remove('active');
@@ -825,7 +808,7 @@
       }
 
       const fixed = fixLines(raw);
-      outputEl.textContent = fixed;
+      outputEl.value = fixed;
       outputEl.classList.remove('empty');
       outputDot.classList.add('active');
       btnCopy.disabled = false;
@@ -862,7 +845,7 @@
     });
 
     btnCopy.addEventListener('click', async () => {
-      const text = outputEl.textContent;
+      const text = outputEl.value;
       if (!text) return;
 
       try {
