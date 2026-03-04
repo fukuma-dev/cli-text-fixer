@@ -601,11 +601,12 @@
       // Strip leading whitespace per line (left-align)
       // Keep relative indent for lines starting with list markers or code
       let lines = text.split('\n');
-      // Strip leading spaces, but preserve inside code blocks
+      // Strip leading spaces, but preserve inside code blocks and box-drawing tables
       let inFence = false;
       lines = lines.map(l => {
         if (l.trim().startsWith('```')) { inFence = !inFence; return l.replace(/^ +/, ''); }
         if (inFence) return l; // preserve code indent
+        if (/^\s*[│┌├└┐┤┘┬┴╔╠╚╗╣╝╦╩═╭╰╮╯]/.test(l)) return l.replace(/^ +/, ''); // left-align but keep internal spacing
         return l.replace(/^ +/, '');
       });
       const result = [];
@@ -648,8 +649,8 @@
           continue;
         }
 
-        // Table: starts with |
-        if (/^\s*\|/.test(line)) {
+        // Table: starts with | or box-drawing characters (│┌├└┐┤┘┬┴─)
+        if (/^\s*[|│┌├└┐┤┘┬┴╔╠╚╗╣╝╦╩═╭╰╮╯]/.test(line)) {
           result.push(line);
           i++;
           continue;
@@ -684,7 +685,7 @@
               /^\s*([-*+]|\d+\.)\s/.test(next) ||
               /^#{1,6}\s/.test(next) ||
               next.trim().startsWith('```') ||
-              /^\s*\|/.test(next) ||
+              /^\s*[|│┌├└┐┤┘┬┴╔╠╚╗╣╝╦╩═╭╰╮╯]/.test(next) ||
               /^\s*>/.test(next) ||
               /^( {4}|\t)/.test(next) ||
               /^(---+|===+|\*\*\*+)$/.test(next.trim())
@@ -714,7 +715,7 @@
             next.trim() === '' ||
             next.trim().startsWith('```') ||
             /^#{1,6}\s/.test(next) ||
-            /^\s*\|/.test(next) ||
+            /^\s*[|│┌├└┐┤┘┬┴╔╠╚╗╣╝╦╩═╭╰╮╯]/.test(next) ||
             /^\s*>/.test(next) ||
             /^( {4}|\t)/.test(next) ||
             /^\s*([-*+]|\d+\.)\s/.test(next) ||
